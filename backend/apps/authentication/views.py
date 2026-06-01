@@ -9,6 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
 from core.responses import success_response
+from apps.audit_logs.models import AuditLog
 from .serializers import LoginSerializer
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,14 @@ class LoginView(APIView):
             samesite='Lax',
             max_age=7 * 24 * 60 * 60,
         )
+
+        # Log after cookie is set — user is now fully authenticated
+        AuditLog.objects.create(
+            actor=user,
+            action='USER_LOGIN',
+            target_email=user.email,
+        )
+
         return response
 
 
@@ -93,4 +102,12 @@ class LogoutView(APIView):
 
         response = success_response(message="Logged out successfully.")
         response.delete_cookie('refresh_token')
+
+        # Log before returning — request.user is still available here
+        AuditLog.objects.create(
+            actor=request.user,
+            action='USER_LOGOUT',
+            target_email=request.user.email,
+        )
+
         return response

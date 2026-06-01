@@ -23,4 +23,5 @@ urlpatterns = [
     path('api/v1/invitations/', include('apps.invitations.urls')),
     path('api/v1/dashboard/', include('apps.dashboard.urls')),
     path('api/v1/users/', include('apps.users.urls')),
+    path('api/v1/audit-logs/', include('apps.audit_logs.urls')),
 ]

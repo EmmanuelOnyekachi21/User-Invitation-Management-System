@@ -7,6 +7,7 @@ import Register from '../pages/Register/Register'
 import CheckEmail from '../pages/CheckEmail/CheckEmail'
 import Users from '../pages/Users/Users'
 import Invitations from '../pages/Invitations/Invitations'
+import AuditLogs from '../pages/AuditLogs/AuditLogs'
 
 const AppRoutes = () => (
   <BrowserRouter>
@@ -19,6 +20,7 @@ const AppRoutes = () => (
       <Route path="/invite" element={<ProtectedRoute adminOnly><InviteUser /></ProtectedRoute>} />
       <Route path="/users" element={<ProtectedRoute adminOnly><Users /></ProtectedRoute>} />
       <Route path="/invitations" element={<ProtectedRoute adminOnly><Invitations /></ProtectedRoute>} />
+      <Route path="/audit-logs" element={<ProtectedRoute adminOnly><AuditLogs /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

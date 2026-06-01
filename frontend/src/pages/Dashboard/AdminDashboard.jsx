@@ -90,8 +90,8 @@ const AdminDashboard = () => {
                 <p className="card-text text-muted small">
                   Review a history of all actions taken across the system.
                 </p>
-                <button className="btn btn-outline-secondary btn-sm" disabled>
-                  Coming Soon
+                <button className="btn btn-primary btn-sm" onClick={() => navigate('/audit-logs')}>
+                  View Logs
                 </button>
               </div>
             </div>
