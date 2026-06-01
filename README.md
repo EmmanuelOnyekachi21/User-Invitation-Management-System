@@ -56,6 +56,41 @@ A role-based user invitation and management system built with Django REST Framew
 
 ---
 
+## API Endpoints
+
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| POST | `/api/v1/auth/login/` | Login | Public |
+| POST | `/api/v1/auth/token/refresh/` | Refresh access token | Public |
+| POST | `/api/v1/auth/logout/` | Logout | Authenticated |
+| GET | `/api/v1/dashboard/stats/` | Invitation stats | Admin |
+| GET | `/api/v1/users/` | List users | Admin |
+| PATCH | `/api/v1/users/<id>/role/` | Update user role | Admin |
+| PATCH | `/api/v1/users/<id>/status/` | Update user status | Admin |
+| GET | `/api/v1/invitations/` | List invitations | Admin |
+| POST | `/api/v1/invitations/` | Create invitation | Admin |
+| POST | `/api/v1/invitations/validate-token/` | Validate invite token | Public |
+| POST | `/api/v1/invitations/accept/` | Accept invitation | Public |
+| DELETE | `/api/v1/invitations/<id>/revoke/` | Revoke invitation | Admin |
+| GET | `/api/v1/audit-logs/` | List audit logs | Admin |
+
+---
+
+## Frontend Pages
+
+| Route | Description | Access |
+|---|---|---|
+| `/login` | Login page | Public |
+| `/register?token=` | Invitation registration | Public |
+| `/check-email` | Post-registration confirmation | Public |
+| `/dashboard` | Role-aware dashboard | Authenticated |
+| `/invite` | Send invitation form | Admin |
+| `/users` | User management table | Admin |
+| `/invitations` | Invitations list | Admin |
+| `/audit-logs` | Audit log viewer | Admin |
+
+---
+
 ## Environment Variables
 
 All variables live in `backend/.env`. A template with empty values is committed at `backend/.env.example`.
@@ -80,26 +115,32 @@ All variables live in `backend/.env`. A template with empty values is committed 
 
 ## Assumptions Made During Development
 
-**1. Invitation-only registration**
-There is no open registration endpoint. Users can only join the platform via an invitation sent by an Admin. This was a deliberate design decision — the invitation link sent to an email address serves as implicit email verification. Sending a separate verification email after registration would be redundant and add unnecessary friction.
+**1. No open registration**
+I decided not to build a public signup page. The only way to create an account is through an invite link sent by an admin. This made sense to me because the system is meant to be controlled. You don't want random people signing up.
 
-**2. Email verification skipped**
-Following from the above, email verification as a separate step was omitted. The invitation token is tied to a specific email address. Completing registration through that link is sufficient proof of email ownership.
+**2. Skipped email verification**
+I skipped the email verification step after registration. My thinking was: if the invite link was sent to your email and you clicked it, that's already proof you own the email. Sending another verification email on top of that felt unnecessary and a bit annoying for the user.
 
-**3. Admin-only invitation privileges**
-Only users with the `ADMIN` role can send invitations, view the user list, and manage roles and statuses. Regular users see a limited dashboard with no administrative actions.
+**3. Only admins can do admin things**
+Things like sending invites, managing users, viewing audit logs — all of that is locked to admin accounts only. Regular users just see a basic dashboard. I felt this was the whole point of having roles in the first place.
 
-**4. Status as source of truth for account access**
-The `status` field (`ACTIVE`, `BANNED`, `SUSPENDED`, `PENDING_VERIFICATION`) drives whether a user can log in, rather than Django's built-in `is_active` flag. The `is_active` field is kept in sync automatically via the model's `save()` method to maintain compatibility with Django internals.
+**4. Status field controls login, not is_active**
+Django has a built-in `is_active` field that controls whether a user can log in. I kept it but made it follow the `status` field automatically. So if someone is banned, `is_active` becomes false on its own. I also had to work around Django's default login function because it was swallowing the real error — it would just say "wrong credentials" even when the account was banned. I fixed that by checking things manually.
 
-**5. Token storage**
-Access tokens are stored in `localStorage`. Refresh tokens are stored in HTTP-only cookies. This is a known tradeoff — `localStorage` is accessible to JavaScript and carries XSS risk. For the scope of this project this is acceptable. In production, access tokens should be stored in memory only.
+**5. Where tokens are stored**
+The short-lived access token goes in localStorage, the refresh token goes in an HTTP-only cookie. I know localStorage isn't the safest place for tokens (it can be read by JavaScript on the page), but it's a common pattern and acceptable for this scope.
 
-**6. Integer primary keys on User model**
-The `User` model uses Django's default integer primary key rather than UUID. This is a known limitation — the `Invitation` model uses UUID PKs via the shared `TokenBaseModel`. Migrating the User model to UUID after initial migrations would require a destructive migration, which was deferred given the development timeline.
+**6. User IDs are integers, not UUIDs**
+I noticed this late. The invitation model uses UUIDs (which is better for security), but the user model still uses regular integer IDs. Changing it after migrations were already created would've meant wiping the database, so I left it and noted it as something to fix properly later.
 
-**7. Session invalidation on ban/suspend**
-When a user's status is set to `BANNED` or `SUSPENDED`, all their outstanding refresh tokens are immediately blacklisted. Their current access token will expire naturally within 15 minutes (the configured lifetime). This is an acceptable window given the short token lifetime.
+**7. Banning someone kicks them out immediately (mostly)**
+When an admin bans or suspends a user, I blacklist all their refresh tokens right away. Their current session will still work for up to 15 minutes until the access token expires, but that felt like an acceptable tradeoff given how short the token lifetime is.
 
-**8. Pagination**
-All list endpoints use page-number pagination with a default page size of 10. Cursor-based pagination would be more performant at scale but page-number pagination was chosen for its simpler UX (page numbers vs next/previous only) given the expected dataset size.
+**8. Page numbers over cursor pagination**
+I went with regular page-number pagination (page 1, 2, 3...) instead of cursor-based pagination. Cursor pagination is faster for huge datasets but the UI is less intuitive. For an admin dashboard with a few hundred users, page numbers made more sense.
+
+**9. Audit logs can't be deleted**
+The audit log endpoint only supports GET. There's no way to delete or edit logs through the API. I did this on purpose — logs are only useful if nobody can tamper with them.
+
+**10. Role checks on the frontend are just for show**
+I decode the JWT on the frontend to decide what to show or hide in the UI (like hiding admin buttons from regular users). But this is purely cosmetic. The real permission checks happen on the backend for every request. The frontend check is just so the UI doesn't look broken.
